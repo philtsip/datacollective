@@ -1,0 +1,201 @@
+{% load url from future %}
+
+<!DOCTYPE html>
+<html lang=en>
+  <head>
+    <title>{{ chart.title }}</title>
+    <meta charset='UTF-8'>
+    <meta property="og:title" content="{{chart.title}}">
+    <meta property="og:description" content="{{chart.description}}">
+    <meta property="og:image" content="https://datacollective.org/chart/image/{{chart.id}}">
+
+    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js"></script>
+
+    <style>
+@font-face {
+    font-family: 'ChunkFiveRegular';
+    src: url('/static/fonts/Chunkfive-webfont.eot');
+    src: url('/static/fonts/Chunkfive-webfont.eot?#iefix') format('embedded-opentype'),
+         url('/static/fonts/Chunkfive-webfont.woff') format('woff'),
+         url('/static/fonts/Chunkfive-webfont.ttf') format('truetype'),
+         url('/static/fonts/Chunkfive-webfont.svg#ChunkFiveRegular') format('svg');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'OpenSansRegular';
+    src: url('/static/fonts/OpenSans-Regular-webfont.eot');
+    src: url('/static/fonts/OpenSans-Regular-webfont.eot?#iefix') format('embedded-opentype'),
+         url('/static/fonts/OpenSans-Regular-webfont.woff') format('woff'),
+         url('/static/fonts/OpenSans-Regular-webfont.ttf') format('truetype'),
+         url('/static/fonts/OpenSans-Regular-webfont.svg#OpenSansRegular') format('svg');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'OpenSansBold';
+    src: url('/static/fonts/OpenSans-Bold-webfont.eot');
+    src: url('/static/fonts/OpenSans-Bold-webfont.eot?#iefix') format('embedded-opentype'),
+         url('/static/fonts/OpenSans-Bold-webfont.woff') format('woff'),
+         url('/static/fonts/OpenSans-Bold-webfont.ttf') format('truetype'),
+         url('/static/fonts/OpenSans-Bold-webfont.svg#OpenSansBold') format('svg');
+    font-weight: normal;
+    font-style: normal;
+}
+
+      body {
+        font: 100% 'OpenSansRegular', verdana, sans-serif;
+        margin:0;
+        padding:0;
+      }
+      h1 {
+        margin:0;
+        font: 200%/125% 'OpenSansBold', verdana, sans-serif;
+      }
+      .title {
+        background-color:#ffde00;
+        padding-left: 0.5em;
+        padding-right: 0.5em;
+        padding-top: 0.25em;
+        padding-bottom: 0.25em;
+        font-size:1.5em;
+        border-radius:15px;
+      }
+      .title a:link,a:visited,a:hover,a:active {
+        color:#ffffff;
+        text-decoration:none;
+      }
+      .titlediv {
+        margin-top: 1.5em;
+        margin-bottom: 1.5em;
+      }
+      .bottom_nav {
+        padding-left: 1em;
+        padding-right: 1em;
+      }
+      #disqus_wrapper {
+        padding:0.5em;
+        margin-top: 1.5em;
+        margin-bottom: 1.5em;
+        max-width:800px;
+        background-color:#eeffee;
+        border-radius:15px;
+        border:2px solid #ccddcc;
+        /*  outline:#ddeedd solid medium; */
+      }
+      #greeting {
+        font-size:10px;
+        text-align: right;
+        margin: 5px 0 -15px 0;
+      }
+    </style>
+  </head>
+  <body style="background-color:#fffafc">
+    <div id="container" style="width:100%; background-color:#fffafc">
+      <div id="main" style="width:800px; margin:auto">
+        {% if user.username %}
+          <div id="greeting">HELLO {{ user.username }} !!
+          &nbsp;
+          <a style="color:#000000" href="{% url 'chart.views.charts_by_user' user.username %}">my charts</a>
+          &nbsp;
+          <a style="color:#000000" href="{% url 'chart.views.new' %}">new chart</a>
+          &nbsp;
+          <a style="color:#000000" href="{% url 'django.contrib.auth.views.logout' %}">logout</a>
+          </div>
+        {% else %}
+          <div id="greeting"><a style="color:#000000" href="{% url 'django.contrib.auth.views.login' %}">login</a></div>
+        {% endif %}
+	<div class="titlediv">
+          <div class="title" style="background-image:url('/static/images/neitsch_quilt_partial.png'); background-color:#2d5344; color:#ffffff; font-family:ChunkFiveRegular; font-size:3em; max-width:750px">
+<!--          <img src="/static/images/neitsch_quilt_48x48.png" style="vertical-align:middle; display:inline"> -->
+          <span style="position:relative; top:5px; left:5px"><a href="/" style="color:#550000" title="Learn about Data Collective">Data Collective</a></span>
+          </div>
+        </div>
+        <div class="titlediv" style="margin-bottom:0px">
+        </div>
+
+        <div id=chart_and_addthis_wrapper style="width:{{ enclosing_width }}px; margin-bottom:50px">
+          <div class="datacollective-chart" id="datacollective-chart-{{chart.id|safe}}" style="padding: 0px; margin: 0px; overflow: hidden; border-radius:15px; border:6px solid #ffde00; background-color: white; padding: 0px">
+            <noscript><iframe src="/chart/embed/{{chart.id|safe}}?internal=1" width="{% if chart.chart_width %}{{chart.chart_width}}{% else %}630{% endif %}" height="690" frameborder="0"></iframe></noscript>
+          </div>
+          <script type="text/javascript" src="/chart/embedjs/{{chart.id|safe}}?internal=1"></script>
+          <div style="float:right; font-size:75%">
+            charting software by <a target="_blank" title="Insanely great charting software" href="http://www.highcharts.com" style="color:#000000; text-decoration:none">Highcharts.com</a>
+          </div>
+
+{% if chart.csv_url %}
+          <span style="float:left; width:280px">
+            <div>
+              <a target="_blank" href=" {{ chart.csv_url }} " title="Download the raw data behind this chart">
+                <img src="/static/images/csv_32x32.png" style="position:relative; left:20px">
+              </a>
+            </div>
+          </span>
+        </div>
+{% endif %}
+
+        <div class="titlediv">
+          <div id="datafromhead" class="title" style="background-color:#E58F17; max-width:600px">
+            <span> data from {{ chart.source_title|safe }} </span>
+          </div>
+          <div id="datafrom" class="title" style="background-color:#E58F17; max-width:800px; margin-top:-1.0em; border-top-left-radius:0px">
+            <br>
+            {% autoescape off %}
+            {{ chart.source_detail }}
+            {% endautoescape %}
+          </div>
+        </div>
+
+        <div class="titlediv">
+          <span id="postedbyhead" class="title" style="background-color:#BF5F22">
+            <span>posted by {{ chart.creator_name }}</span>
+          </span>
+          <div id="postedby" class="title" style="background-color:#BF5F22; max-width:800px; margin-top:-0.5em; border-top-left-radius:0px">
+            <div  style="float:right; margin-right:0px; margin-top:10px">
+              <img src="{{ chart.creator_avatar }}" style="border-radius:5px; border:5px solid #fffafc; padding:0px">
+            </div>
+            <br>
+            {% autoescape off %}
+            {{ chart.chart_creator_detail }}
+            {% endautoescape %}
+          </div>
+        </div>
+
+        <div id="disqus_wrapper">
+          <div id="disqus_thread"></div>
+          <script type="text/javascript">
+            /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+            var disqus_shortname = 'd4t4'; // required: replace example with your forum shortname
+
+            // The following are highly recommended additional parameters. Remove the slashes in front to use.
+            var disqus_identifier = '{{ chart.disqus_identifier }}';
+            var disqus_url = 'https://{{ host }}/{{ chart.get_abolute_url }}';
+
+            {% if debug %}
+            var disqus_developer = 1;
+            {% endif %}
+
+            /* * * DON'T EDIT BELOW THIS LINE * * */
+            (function() {
+              var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+              dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+              (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+            })();
+          </script>
+          <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+          <a href="http://disqus.com" class="dsq-brlink">blog comments powered by <span class="logo-disqus">Disqus</span></a>
+        </div>
+
+        <div class="titlediv">
+          <div class="title" style="background-color:#2d5344; color:#ffffff; width:800px; font-size:1.0em; font-family:ChunkFiveRegular; padding-top:1em; padding-bottom:1em">
+            <span class="bottom_nav"><a href="//{{ host }}" title="Learn about Data Collective">About</a></span>
+            <span class="bottom_nav">Blog</span>
+            <span style="float:right">©2011 Data Collective</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

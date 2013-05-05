@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+  </head>
+  <body>
+
+    <h1>Documentation</h1>
+
+    <p>
+    (Eventually this will move to a wiki or something.)
+    </p>
+
+    <h4>Contents</h4>
+    <ul>
+      <li><a href="#setup">Setup</a>
+      <ul>
+        <li><a href="#prereqs">Installing prerequisites</a>
+        <li><a href="#running">Running the development server</a>
+        <ul>
+          <li><a href="#unicode">Unicode errors</a>
+        </ul>
+        <li><a href="#server">Setting up a production server</a>
+      </ul>
+      <li><a href="#updating">Updating development environments</a>
+      <li><a href="#deploying">Deploying</a>
+      <li><a href="#logging">Logging</a>
+      <li><a href="#updatingdata">Updating data</a>
+      <li><a href="#schemamigration">Schema migration</a>
+      <li><a href="#browsertesting">Browser testing</a>
+      <li><a href="#stuff">Stuff to look into</a>
+      </ul>
+
+      <a name="setup"></a>
+      <h2>Setup</h2>
+
+      <p>
+      To get a version running on your local machine, assuming you have a Mac:
+      </p>
+
+      <a name="prereqs"></a>
+      <h3>Installing prerequisites</h3>
+
+      <p>
+      These steps only needs to be followed once. You’ll install python
+      locally, and a tool to make installing needed python libraries easy.
+      </p>
+
+      <ol>
+        <li>Download <a
+          href="http://www.python.org/ftp/python/2.7.2/Python-2.7.2.tar.bz2">Python-2.7.2.tar.bz2</a>,
+        and build it with <code>./configure --with-system-expat
+          --prefix=$HOME/local &amp;&amp; make -j2 &amp;&amp; make
+          install</code>
+        <li>Add <code>$HOME/local/bin</code> to your path in
+        <code>~/.bashrc</code> or <code>~/.bash_profile</code> as needed
+        <li>Run <code>hash -r</code> to clear the binary path cache
+        <li>Download <a
+          href="http://pypi.python.org/packages/source/d/distribute/distribute-0.6.19.tar.gz">http://pypi.python.org/packages/source/d/distribute/distribute-0.6.19.tar.gz</a>,
+        unpack and cd into it and run
+        <code>python2.7 setup.py install</code>
+        <li>Run <code>easy_install-2.7 pip</code>
+        <li>Download and install <a href="http://dev.mysql.com/get/Downloads/MySQL-5.1/mysql-5.1.58.tar.gz">MySQL-5.1.58.tar.gz</a>
+      </ol>
+
+      <a name="running"></a>
+      <h3>Running the development server</h3>
+
+      <p>
+      First, set up a MySQL database. This script will create a database
+      for you and configure everything. It will be insecure in that anyone
+      on your local machine will be able to connect to the database and do
+      anything, but the database server won’t be connected to the network
+      and it will suffice for development.
+      </p>
+
+<pre>if [ -f ~/.my.cnf ]; then
+  echo 'You’ll need to configure MySQL manually, sorry.'
+else
+  touch ~/.my.cnf
+  chmod 0600 ~/.my.cnf
+  mkdir -p ~/local/tmp
+  echo "[mysqld]
+skip-networking
+socket=$HOME/local/tmp/mysql.sock
+
+[client]
+socket=$HOME/local/tmp/mysql.sock" &gt; ~/.my.cnf
+
+  mysql_install_db
+  mysqld_safe &amp;
+  (for ((n=0; n&lt;100; n=n+1)); do
+     if [ -e ~/local/tmp/mysql.sock ]; then
+       break
+     fi
+     sleep 0.1
+  done)
+  mysql -u root -e "grant all privileges on *.* to ''@'localhost' with grant option;"
+  mysql -e "create database dc default character set utf8;"
+  echo 'database="dc"' &gt;&gt; ~/.my.cnf
+  echo
+  echo 'The server is now running.'
+  echo 'Run the command "mysqladmin shutdown" to shut down the server.'
+fi
+</pre>
+
+      <p>
+      Then run this script to set up the web site and run it in development
+      mode:
+      </p>
+
+      <pre>
+# clone main repo
+hg clone ssh://hg@bitbucket.org/datacollective/dc
+cd dc
+pip install -r requirements.txt
+cd web
+# clone private repo for non-freely-redistributable code
+hg clone ssh://hg@bitbucket.org/datacollective/dcvendor vendor
+./manage.py developmentsetup
+./manage.py runservers
+# Visit http://localhost:8000/, http://localhost:8001/chart/,
+# http://localhost:8001/admin/
+</pre>
+
+      <p>
+      After fetching code changes, you might have to run
+      </p>
+
+      <pre>
+pip -q install -r requirements.txt
+./manage.py syncdb --migrate
+</pre>
+
+      <p>
+      to pick up new dependencies or schema changes.
+      </p>
+
+      <p>
+      You can specify which site to operate on with the option
+      <code>./manage.py --dc</code> or <code>./manage.py --d4t4</code>. But
+      all of the configuration except for URL definitions is shared between
+      the two sites, so the default <code>--dc</code> is usually good
+      enough.
+      </p>
+
+      <p>
+      <code>./manage.py</code> also takes a <code>--db</code> option, which
+      specifies which database to connect to. So you can restore the
+      production database with <code>zcat dump.gz | mysql</code>
+      and then run <code>./manage.py --db d4t4_web runservers</code>
+      to work with it.
+      </p>
+
+      <a name="unicode"></a>
+      <h4>Unicode errors</h4>
+
+      <p>
+      If you get messages like <tt>UnicodeEncodeError: 'ascii' codec can't
+      encode characters in position 40-45: ordinal not in
+      range(128)</tt>, that means your python installation is defaulting
+      to using ASCII. You can fix this with a <code>sitecustomize.py</code>
+      file. First check if you have one already with this command:
+      </p>
+
+      <pre>python -c 'import sys; print sys.modules.get("sitecustomize", None)'</pre>
+
+      <p>
+      If that doesn’t tell you about an existing
+      <code>sitecustomize.py</code> file, create one in
+      <code>~/local/lib/python2.7/sitecustomize.py</code>. Then add these
+      two lines to it:
+      </p>
+
+<pre>import sys
+sys.setdefaultencoding('UTF-8')</pre>
+
+      <a name="server"></a>
+      <h3>Setting up a production server</h3>
+
+      <ol>
+        <li>Create a new UNIX user
+        <li>Follow the instructions in <a href="#prereqs">Installing
+          prerequisites</a> above
+        <li>Copy the ssh keys <tt>id_rsa</tt> and <tt>id_rsa.pub</tt> for
+        the <tt>webmaster+deployment@datacollective.org</tt> bitbucket
+        account to <tt>~/.ssh/authorized_keys</tt>
+        <li>In <tt>$HOME</tt>, run this script:
+<pre># clone main repo
+pip install mercurial
+mkdir hg
+cd hg
+hg clone -U ssh://hg@bitbucket.org/datacollective/dc
+# clone private repo for non-freely-redistributable code
+hg clone -U ssh://hg@bitbucket.org/datacollective/dcvendor dcvendor</pre>
+
+        <li>Create a database</li>
+        <li>Run the script
+<pre>touch ~/.my.cnf
+chmod 0600 ~/.my.cnf
+echo '[client]
+password="password"
+host="mysql.example.org"
+user="username"
+database="database_name"
+
+[mysqldump]
+all-databases=1' &gt; ~/.my.cnf</pre>
+        and enter the database credentials into the <tt>~/.my.cnf</tt>
+        template.
+        <li>Restore the database with <code>zcat database-dump.gz |
+          mysql</code>
+        <li><tt>rsync</tt> over the <tt>data</tt> directory
+        <li>Run the command <code>(cd ~/hg/dc &amp;&amp; hg cat -r tip
+          scripts/deploy) | python2.7</code> to deploy.
+        <li>Configure the web server to serve using passenger
+        <li>Important: when adding a new domain in the web host control
+        panel, you need to go to “Site Statistics” and change the “Raw Logs
+        to Keep” entry to 30 days for all domains.
+        <li>Permit the server to send mail by running the following as root: <code>sudo apt-get install bsd-mailx</code>
+      </ol>
+
+      <a name="updating"></a>
+      <h2>Updating development environments</h2>
+      <p>
+      Run <tt>./manage.py update</tt> to get newly checked-in source,
+      upgrade required libraries, and apply new data migrations.
+      </p>
+
+      <a name="deploying"></a>
+      <h2>Deploying</h2>
+      <p>
+      Once your changes are pushed to bitbucket, run
+      </p>
+
+<pre>
+./manage.py deploy
+</pre>
+
+      <p>
+      to push them to production.
+      </p>
+
+      <p>
+      For now, you need a UNIX account on the server to do this.
+      </p>
+
+      <p>
+      If you get any errors, keep in mind that the errors are occurring on
+      the server, so you’ll probably need to log in there to debug and fix
+      them.
+      </p>
+
+      <a name="Logging"></a>
+      <h2>Logging</h2>
+
+      <p>
+      In production, the standard apache <tt>access.log</tt> and
+      <tt>error.log</tt> files are on the web server, in
+      <tt>~/logs/${DOMAIN}/http</tt> and <tt>~/logs/${DOMAIN}/https</tt>.
+      </p>
+
+      <p> Note that most of the logs on the servers are in
+      <tt>America/Los_Angeles</tt> time.
+      </p>
+
+      <p>
+      Apache’s logs will have error code 500 if there’s a problem, but they
+      won’t tell you any details.
+      </p>
+
+      <p>
+      The webapp’s <tt>stdout</tt> and <tt>stderr</tt> are written to
+      <tt>~/${DOMAIN}/error.log</tt>. Due to flushing issues some messages
+      may be cut off in a crash. <a
+        href="https://docs.djangoproject.com/en/dev/topics/logging/">Django’s
+        regular logging mechanism</a> is configured to write to these files
+      too.
+      </p>
+
+      <p>
+      However, some error messages, especially with syntax errors in the
+      webapp startup code, may go into the webapp runner log file which is
+      currently
+      <tt>/usr/local/dh/apache2/logs/apache2-lip/error.log.1</tt>. That
+      path may change at any time. If that file stops being updated,
+      there’s a bit of code in <tt>passenger_wsgi.py</tt> that you can
+      toggle to find out the new path.
+      </p>
+
+      <a name="schemamigration"></a>
+      <h2>
+        Schema migration
+      </h2>
+
+      <p>
+      <a href="http://south.aeracode.org/">South</a> is the most popular tool
+      for schema migration. It lets you snapshot Django models, perform
+      simple operations using snapshotted models, and auto-generates code to
+      migrate between model snapshots.
+      </p>
+
+      <p>
+      The South development workflow is:
+      </p>
+
+      <ol start=0>
+        <li>Capture the model with
+        <code>./manage.py schemamigration appname --initial</code>
+        <li>Update the model by hand
+        <li>Snapshot the new model and generate a migration script with
+        <code>./manage.py schemamigration appname --auto
+          short_change_name</code>
+        <li>If needed, create a template data migration file with
+        <code>./manage.py datamigration appname short_change_name</code> and
+        insert the needed logic by hand, using
+        <code>orm.Modelname</code> object to access the snapshotted model
+        <li>Run <code>./manage.py migrate appname</code> to change the schema
+        in the database and run any data migration code
+        <li>Go to step 1
+      </ol>
+
+      <p> The <a
+        href="http://south.aeracode.org/docs/tutorial/index.html">tutorial</a>
+      walks you through changing a database that uses plaintext passwords to
+      one with salted hashed passwords—not that that’s any more secure <a
+        href="http://codahale.com/how-to-safely-store-a-password/"> these
+        days</a>. The concrete migration plan:</p>
+
+      <ol>
+        <li>Add <code>password_salt</code> and <code>password_hash</code>
+        fields to the model.
+        <li>Capture the change with <code>schemamigration</code>
+        <li>Create a data migration that hashes the plaintext passwords
+        <li>Remove the model’s plaintext password column
+        <li>Capture the change with <code>schemamigration</code>
+      </ol>
+
+      <p>
+      You can do all that, save it in version control, and then on the
+      production server run <code>hg update &amp;&amp; ./manage.py syncdb
+        &amp;&amp; ./manage.py migrate</code> and everything will be up to
+      date—except that the code and the database will be inconsistent during
+      the upgrade, causing downtime if you stop the server, or errors and
+      possible data corruption if you don’t.
+      </p>
+
+      <p>
+      The continuous-deployment way to do it on the server is:
+      </p>
+
+      <ol>
+        <li>Add the new columns to the database.
+        <li>Deploy code that can work with both versions—it’ll use the hashed
+        password if there’s a hash, otherwise fall back to plaintext.
+        <li>Run the password-hashing data migration.
+        <li>Deploy code that only knows about hashed passwords.
+        <li>When that’s definitely working, drop the plaintext password
+        column.
+      </ol>
+
+      <p>
+      That’s a very different order from the South workflow, and irreversible
+      operations like dropping columns being migrated should probably be
+      written at the same time as the rest of the migration, although the
+      change might not be deployed for quite some time, if ever.
+      </p>
+
+      <p>
+      South can definitely do the individual schema and data migrations, and
+      if we’re ok with downtime we can do them all at once at the same time
+      as the code upgrade without writing any more tools.
+      </p>
+
+      <p>
+      But for continuous availability we’ll probably do something like this
+      to ensure at runtime that the model code is compatible with the
+      database schema:
+      </p>
+
+      <pre>if db_version == 3:
+  class Chart(models.Model):
+    # previous version of model
+    ...
+elif db_version == 4:
+  class Chart(models.Model):
+    # intermediate version of model
+    ...
+elif db_version == 5:
+  class Chart(models.Model):
+    # new version of model
+    ...
+</pre>
+      </p>
+
+      <p>
+      The details for that still need to be worked out though.
+      </p>
+
+      <a name="browsertesting"></a>
+      <h2>Browser testing</h2>
+      <p>To create an html report of browser screenshots on multiple platforms for a given URL, use the 'saucecompare' management command:</p>
+      <p><pre>./manage.py saucecompare &lt;url&gt; [saucecompare.html]</pre></p>
+      <p>The output path is optional.</p>
+      <p>Prior to using the command, you'll need to add the Sauce Labs user and key to ~/.dc_secrets.json.</p>
+      <p></p>
+
+      <a name="stuff"></a>
+      <h2>Stuff to look into</h2>
+
+      <ul>
+        <li><a href="http://ontwik.com/python/disqus-scaling-the-world%E2%80%99s-largest-django-application/">Scaling The World’s Largest Django Application</a>,
+        slides and video of how Disqus manages Django.
+
+        <li>
+        <a
+          href="http://blip.tv/djangocon-europe-2011/tuesday-1145-szilveszter-farkas-5310580">Video
+          of talk about continuous deployment with Django at Prezi</a>. Lots
+        of references to tools.
+
+      </ul>
+
+    </body>
+
+  </html>

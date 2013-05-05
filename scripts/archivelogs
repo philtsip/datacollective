@@ -1,0 +1,27 @@
+#!/bin/bash
+
+set -eu
+set -o pipefail
+
+cd
+
+for LOG in logs/*/http{,s}/{access,error}.log.*.gz; do
+    if ! [ -f "${LOG}" ]; then
+        continue
+    fi
+
+    NEWLOG="logs.archived/${LOG#logs/}"
+    if [ -f "${NEWLOG}" ]; then
+        continue
+    fi
+
+
+    NEWLOGDIR="$(dirname -- "${NEWLOG}")"
+    mkdir -p -- "${NEWLOGDIR}"
+
+    RESOLVED_LOG="${NEWLOG%.gz}.resolved.gz"
+    zcat "${LOG}" | logresolve | gzip > "${RESOLVED_LOG}"
+
+    # root owns log directory, can’t move files out
+    cp -p -- "${LOG}" "${NEWLOG}"
+done

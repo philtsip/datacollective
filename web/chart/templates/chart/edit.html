@@ -1,0 +1,679 @@
+{% load url from future %}
+
+<html style="overflow-x:hidden; overflow-y:hidden">
+  <head>
+    <style type="text/css">
+      @font-face {
+          font-family: 'ChunkFiveRegular';
+          src: url('/static/fonts/Chunkfive-webfont.eot');
+          src: url('/static/fonts/Chunkfive-webfont.eot?#iefix') format('embedded-opentype'),
+               url('/static/fonts/Chunkfive-webfont.woff') format('woff'),
+               url('/static/fonts/Chunkfive-webfont.ttf') format('truetype'),
+               url('/static/fonts/Chunkfive-webfont.svg#ChunkFiveRegular') format('svg');
+          font-weight: normal;
+          font-style: normal;
+      }
+
+      @font-face {
+          font-family: 'OpenSansRegular';
+          src: url('/static/fonts/OpenSans-Regular-webfont.eot');
+          src: url('/static/fonts/OpenSans-Regular-webfont.eot?#iefix') format('embedded-opentype'),
+               url('/static/fonts/OpenSans-Regular-webfont.woff') format('woff'),
+               url('/static/fonts/OpenSans-Regular-webfont.ttf') format('truetype'),
+               url('/static/fonts/OpenSans-Regular-webfont.svg#OpenSansRegular') format('svg');
+          font-weight: normal;
+          font-style: normal;
+      }
+
+      @font-face {
+          font-family: 'OpenSansBold';
+          src: url('/static/fonts/OpenSans-Bold-webfont.eot');
+          src: url('/static/fonts/OpenSans-Bold-webfont.eot?#iefix') format('embedded-opentype'),
+               url('/static/fonts/OpenSans-Bold-webfont.woff') format('woff'),
+               url('/static/fonts/OpenSans-Bold-webfont.ttf') format('truetype'),
+               url('/static/fonts/OpenSans-Bold-webfont.svg#OpenSansBold') format('svg');
+          font-weight: normal;
+          font-style: normal;
+      }
+
+      body {
+        background-color: white;
+      }
+
+      h1 {
+        margin-top:8px;
+        margin-left:8px;
+        margin-right:8px;
+        margin-bottom:0px;
+        color: #3E679F;
+        font: 200%/125% 'ChunkFiveRegular', verdana, sans-serif;
+      }
+
+      .chartForm {
+        background-color: #ddd;
+        padding: 10px;
+      }
+
+      .formfield {
+        margin-bottom: 8px;
+      }
+
+      .editorTab {
+        padding: 10px;
+        font-size: 125%;
+        cursor: pointer;
+      }
+
+      .activeEditorTab {
+        background-color: #ddd;
+      }
+
+      .chartForm .status {
+        background-color:transparent;
+        border:none;
+        width:10em;
+      }
+
+      #saveChartSettings, #saveQuitChartSettings,
+      #saveSeries, #saveQuitSeries {
+        width:8em;
+      }
+    </style>
+
+    <script src="https://www.google.com/jsapi?key=ABQIAAAAkWq49XHvu8X8iulRFnhxzhQ3Gsq7pFPFeBuJN0rzxVAMBkA73hR2TPEi2ydIp26PuFwdURBB2igsNg" type="text/javascript"></script>
+    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js"></script>
+    <script type="text/javascript" src="/static/highcharts.js"></script>
+
+    <script type="text/javascript">
+      // -- DocumentMgr
+
+      function DocumentMgr() {
+        this.init = function() {
+          this.savedSettings = this.currentSettings();
+        };
+
+        this.currentSettings = function() {
+          return {
+            chart_title: $("#chart_title").text(),
+            chart_html_below_title: $("#chart_html_below_title").html(),
+            chart_y_axis_description: $("#chart_y_axis_description").text(),
+            chart_source_title: $("#chart_source_title").html(),
+            chart_width: $("#datacollective-chart-{{chart.id}}").width()
+          };
+        };
+
+        this.resetSettings = function() {
+          // No-op.
+        };
+
+        this.saveSettings = function() {
+          this.savedSettings = this.currentSettings();
+        };
+
+        this.init();
+      }
+
+      // -- SettingsMgr
+
+      function SettingsMgr() {
+        this.init = function() {
+          this.savedSettings = {{chart.chart_settings|safe}};
+
+          if (!this.savedSettings.plotOptions) {
+            this.savedSettings.plotOptions = {};
+          }
+          if (!this.savedSettings.plotOptions.line) {
+            this.savedSettings.plotOptions.line = {};
+          }
+          if (!this.savedSettings.xAxis) {
+            this.savedSettings.xAxis = {};
+          }
+          if (!this.savedSettings.xAxis.title) {
+            this.savedSettings.xAxis.title = {};
+          }
+          if (!this.savedSettings.yAxis) {
+            this.savedSettings.yAxis = {};
+          }
+          if (!this.savedSettings.yAxis.title) {
+            this.savedSettings.yAxis.title = { text: null };
+          }
+
+          this.currentSettings = $.extend(true, {}, this.savedSettings);
+        };
+
+        this.saveSettings = function() {
+          this.savedSettings = $.extend(true, {}, this.currentSettings);
+        };
+
+        this.resetSettings = function() {
+          this.currentSettings = $.extend(true, {}, this.savedSettings);
+        };
+
+        this.allSettings = function() {
+          var settings = {};
+          $.extend(true, settings, this.baseSettings);
+          $.extend(true, settings, this.currentSettings);
+          return settings;
+        };
+
+        this.baseSettings = {
+          chart: {
+            renderTo: 'chartdiv',
+            defaultSeriesType: 'line'
+          },
+          title: { text: "" },
+          credits: { text: "" },
+          plotOptions: {
+                          line: {
+                                 lineWidth: 5,
+                                 marker: { enabled: false,
+                                           symbol: 'circle',
+                                           states: {
+                                                hover: {
+                                                   enabled: true
+                                                }
+                                           }
+                                         }
+                          }
+                       },
+        };
+
+        this.init();
+      }
+
+      // -- SeriesMgr
+
+      SeriesMgr = function() {
+        this.init = function() {
+          this.savedSeries = {{chart.chart_data|safe}};
+          this.currentSeries = $.extend(true, [], this.savedSeries);
+        };
+
+        this.resetSeries = function() {
+          this.currentSeries = $.extend(true, [], this.savedSeries);
+        };
+
+        this.saveSeries = function() {
+          this.savedSeries = $.extend(true, {}, this.currentSeries);
+        };
+
+        this.formattedSeriesData = function(series) {
+          var nSeries = series.length;
+
+          if (nSeries === 0) {
+            return "";
+          }
+
+          var result = "";
+          var nPoints = series[0].data.length;
+
+          for (iSeries = 0; iSeries < nSeries; ++iSeries) {
+            if (iSeries !== 0) {
+              result += "\t";
+            }
+            result += series[iSeries].name;
+          }
+
+          result += "\n";
+
+          for (iPoint = 0; iPoint < nPoints; ++iPoint) {
+            var line = "";
+
+            for (iSeries = 0; iSeries < nSeries; ++iSeries) {
+              if (iSeries !== 0) {
+                line += "\t";
+              }
+              line += series[iSeries].data[iPoint].toString();
+            }
+
+            result += line + "\n";
+          }
+
+          return result;
+        };
+
+        this.init();
+      }
+
+      // -- Editor
+
+      function Editor() {
+        this.init = function() {
+          this.documentMgr = new DocumentMgr();
+          this.settingsMgr = new SettingsMgr();
+          this.seriesMgr = new SeriesMgr();
+        };
+
+        this.initForm = function() {
+          $("#chartTitle").val($("#chart_title").text());
+          $("#chartHtmlBelowTitle").val($("#chart_html_below_title").html());
+          $("#chartYAxisDescription").val($("#chart_y_axis_description").text());
+          $("#chartSourceTitle").val($("#chart_source_title").html());
+          $("#chartWidth").val($("#datacollective-chart-{{chart.id}}").width());
+          $("#seriesData").val(this.seriesMgr.formattedSeriesData(this.seriesMgr.currentSeries));
+
+          var chartSettings = this.settingsMgr.allSettings();
+
+          this.initFormField(chartSettings, "plotOptions.line.pointStart", "pointStart");
+          this.initFormField(chartSettings, "plotOptions.line.pointInterval", "pointInterval");
+
+          this.initFormField(chartSettings, "xAxis.min", "xAxisMin");
+          this.initFormField(chartSettings, "xAxis.title.text", "xAxisTitle");
+
+          this.initFormField(chartSettings, "yAxis.min", "yAxisMin");
+          this.initFormField(chartSettings, "yAxis.title.text", "yAxisTitle");
+
+	  this.setDocDirty(false);
+        };
+
+        this.initFormField = function(chartSettings, objName, elName) {
+          var value;
+
+          try {
+            value = eval("chartSettings." + objName);
+          } catch (err) {}
+
+          if (value == null || typeof(value) == "undefined") {
+            value = "";
+          }
+
+          $("#" + elName).val(value.toString());
+        };
+
+        this.onRevert = function() {
+          $("#chart_title").text(this.documentMgr.savedSettings.chart_title);
+          $("#chart_html_below_title").html(this.documentMgr.savedSettings.chart_html_below_title);
+          $("#chart_y_axis_description").text(this.documentMgr.savedSettings.chart_y_axis_description);
+          $("#chart_source_title").html(this.documentMgr.savedSettings.chart_source_title);
+	  $("#datacollective-chart-{{chart.id}}").width(this.documentMgr.savedSettings.chart_width);
+
+          this.settingsMgr.resetSettings();
+          this.seriesMgr.resetSeries();
+
+	  this.setDocDirty(false);
+
+          this.initForm();
+          renderDynamicChart();
+        };
+
+        this.onSave = function(callback) {
+	  this.setDocDirty(false);
+
+          this.setStatus("Saving...", 0);
+
+          var data = $.extend(true, {chart_settings: this.settingsMgr.currentSettings}, this.documentMgr.currentSettings());
+          data.chart_data = this.seriesMgr.currentSeries;
+          var self = this;
+
+          $.ajax({
+            url: "{% url 'chart.views.update' chart.id %}",
+            type: "POST",
+            data: JSON.stringify(data),
+            success: function(data, textStatus, jqXHR) { self.onSaveSuccess(data, textStatus, jqXHR); callback(); },
+            error: function(jqXHR, textStatus, errorThrown) { self.onSaveError(jqXHR, textStatus, errorThrown); }
+          });
+        };
+
+        this.onSaveSuccess = function(data, textStatus, jqXHR) {
+          if (data !== "ok") {
+            return this.onSaveError(null, null, "no status");
+          }
+
+          this.documentMgr.saveSettings();
+          this.settingsMgr.saveSettings();
+          this.seriesMgr.saveSeries();
+
+          this.setStatus("Saved.", 0);
+          this.setStatus("", 3000);
+        };
+
+        this.onSaveError = function(jqXHR, textStatus, errorThrown) {
+	  this.setDocDirty(true);
+
+          this.setStatus("", 0);
+
+          if (!errorThrown) {
+            errorThrown = "unknown";
+          }
+          alert("Chart settings could not be saved (" + errorThrown + ").");
+        };
+
+        this.onConvert = function() {
+	  editor.setDocDirty(true);
+
+          this.setStatus("Importing...", 0);
+
+          var data = {data: $("#seriesData").val()};
+          var self = this;
+
+          $.ajax({
+            url: "{% url 'chart.views.convert_data' %}",
+            type: "POST",
+            dataType: "json",
+            data: JSON.stringify(data),
+            success: function(data, textStatus, jqXHR) { self.onConvertSuccess(data, textStatus, jqXHR); },
+            error: function(jqXHR, textStatus, errorThrown) { self.onConvertError(jqXHR, textStatus, errorThrown); }
+          });
+        };
+
+        this.onConvertSuccess = function(data, textStatus, jqXHR) {
+          this.seriesMgr.currentSeries = data;
+          this.setStatus("Imported.", 0);
+          this.setStatus("", 3000);
+          renderDynamicChart();
+        };
+
+        this.onConvertError = function(jqXHR, textStatus, errorThrown) {
+          this.setStatus("", 0);
+          if (!errorThrown) {
+            errorThrown = "unknown";
+          }
+          alert("This data could not be imported (" + errorThrown + ").");
+        };
+
+        this.setStatus = function(text, timeout) {
+          setTimeout(function() { $("#settingsStatus").val(text); }, timeout);
+          setTimeout(function() { $("#seriesStatus").val(text); }, timeout);
+        };
+
+        this.setDocDirty = function(dirty) {
+          $("#saveQuitChartSettings").val(dirty ? "Save & Quit" : "Quit");
+          $("#saveQuitSeries").val(dirty ? "Save & Quit" : "Quit");
+
+          $("#resetChartSettings").attr('disabled', !dirty);
+          $("#saveChartSettings").attr('disabled', !dirty);
+          $("#saveQuitChartSettings").attr('disabled', false);
+          $("#resetSeries").attr('disabled', !dirty);
+          $("#saveSeries").attr('disabled', !dirty);
+          $("#saveQuitSeries").attr('disabled', false);
+        }
+
+        this.init();
+      }
+
+      function renderDynamicChart() {
+        var chartSettings = editor.settingsMgr.allSettings();
+
+        chartSettings.series = editor.seriesMgr.currentSeries;
+
+        if (!chartSettings.xAxis.labels) {
+          chartSettings.xAxis.labels = {};
+        }
+        chartSettings.xAxis.labels.formatter = function() { return this.value; };
+	chartSettings.plotOptions.line.animation = false;
+
+        var chart = new Highcharts.Chart(chartSettings);
+
+        return chart;
+      }
+
+      function activateSettingsEditor() {
+        $("#settingsTab").addClass("activeEditorTab");
+        $("#seriesTab").removeClass("activeEditorTab");
+
+        $("#seriesForm").hide();
+        $("#settingsForm").show();
+      }
+
+      function activateSeriesEditor() {
+        $("#seriesTab").addClass("activeEditorTab");
+        $("#settingsTab").removeClass("activeEditorTab");
+
+        $("#settingsForm").hide();
+        $("#seriesForm").show();
+      }
+
+      $(document).ready(function() {
+        editor = new Editor();
+
+        editor.initForm();
+
+        saveAndQuit = function(event) {
+           var url = "{% url 'chart.views.view' chart.id %}";
+           editor.onSave( function(){ document.location.href = url } );
+        };
+
+        var chart = renderDynamicChart();
+
+        var boxHandler = function(event){
+            var theString = $(event.target).val();
+            if (event.target.id == "chartTitle")
+                 $('#chart_title').html(theString);
+            else if (event.target.id == "chartHtmlBelowTitle")
+                 $('#chart_html_below_title').html(theString);
+            else if (event.target.id == "chartYAxisDescription")
+                 $('#chart_y_axis_description').html(theString);
+            else if (event.target.id == "chartSourceTitle")
+                 $('#chart_source_title').html(theString);
+
+            editor.setDocDirty(true);
+        };
+
+        var fieldToOptionBindings = {
+           pointStart: "plotOptions.line.pointStart",
+           pointInterval: "plotOptions.line.pointInterval",
+           yAxisMin: "yAxis.min",
+           xAxisMin: "xAxis.min",
+           yAxisTitle: "yAxis.title.text",
+           xAxisTitle: "xAxis.title.text"
+        }
+
+	// TODO refactor to combine this function with the next one, which is eerily similar
+        var chartLabelHandler = function(event){
+           var options = chart.options;
+
+           var value = $(event.target).val();
+           var objName = fieldToOptionBindings[event.target.id];
+
+           if (value !== null && value != '') {
+	       eval("options." + objName + "= value");
+               eval("editor.settingsMgr.currentSettings." + objName + " = value");
+           } else {
+	       eval("delete options." + objName);
+               eval("delete editor.settingsMgr.currentSettings." + objName);
+           }
+
+	   chart = renderDynamicChart();
+
+           editor.setDocDirty(true);
+         };
+
+        var chartLimitHandler = function(event){
+           var options = chart.options;
+
+           var value = $(event.target).val();
+           var objName = fieldToOptionBindings[event.target.id];
+
+           if (value !== null && value != '') {
+               var theVal = parseFloat(value);
+	       eval("options." + objName + "= theVal");
+               eval("editor.settingsMgr.currentSettings." + objName + " = theVal");
+           } else {
+	       eval("delete options." + objName);
+               eval("delete editor.settingsMgr.currentSettings." + objName);
+           }
+
+	   chart = renderDynamicChart();
+
+           editor.setDocDirty(true);
+         };
+
+        // When the user types a keystroke into certain fields,
+        // if they stop typing for 2 seconds, then we'll apply
+        // their change so they can see it.
+        var USER_EDITING_PATIENCE = 2 * 1000;
+        var userDoneEditingTimeout = {};
+
+        var chartTimeoutHandler = function(event){
+           if (userDoneEditingTimeout[event.target]) {
+               clearTimeout(userDoneEditingTimeout[event.target]);
+           }
+           userDoneEditingTimeout[event.target] = setTimeout(
+             function() {
+               chartLimitHandler(event);
+               delete userDoneEditingTimeout[event.target];
+             }, 
+             2000);
+        };
+
+        var editingTimeoutHandler = function(delay, afterHandler) {
+           return function (event) {
+             if (userDoneEditingTimeout[event.target]) {
+                 clearTimeout(userDoneEditingTimeout[event.target]);
+             }
+             userDoneEditingTimeout = setTimeout(
+               function() {
+                 afterHandler(event);
+                 delete userDoneEditingTimeout[event.target];
+               }, 
+               delay);
+          };
+        }
+
+        var widthAdjustHandler = function(event) {
+            var options = chart.options;
+            options.plotOptions.line.animation = false;
+            var theString = $(event.target).val();
+            $("#datacollective-chart-{{chart.id}}").width(theString);
+            new Highcharts.Chart(options);
+            options.plotOptions.line.animation = true;
+            editor.setDocDirty(true);
+        }
+
+        var seriesConvertHandler = function(event) {
+          editor.onConvert();
+        }
+
+        var changeable = $("#chartTitle, #chartHtmlBelowTitle, #chartSourceTitle, #chartYAxisDescription");
+
+        var chartLabels = $('#xAxisTitle, #yAxisTitle');
+
+        var chartLimits = $('#pointStart, #pointInterval, #xAxisMin, #yAxisMin');
+
+        changeable.bind('keyup', boxHandler);
+        chartLabels.bind('keyup', chartLabelHandler);
+        chartLimits.bind('blur', chartLimitHandler);
+        chartLimits.bind('keyup', editingTimeoutHandler(750, chartLimitHandler));
+	$("#chartWidth").bind('blur', widthAdjustHandler)
+	$("#chartWidth").bind('keyup', editingTimeoutHandler(750, widthAdjustHandler))
+
+        $('#seriesData').bind('blur', seriesConvertHandler );
+        $('#seriesData').bind('keyup', seriesConvertHandler );
+      });
+    </script>
+  </head>
+
+  <body>
+    <table><tr>
+      <td valign="top">
+        <div>
+          <div class="datacollective-chart" id="datacollective-chart-{{chart.id}}" style="width: {{chart.chart_width}}" margin="auto">
+          <h1 id="chart_title" align="left">{{chart.title}}</h1>
+          <p id="chart_html_below_title" align="left" style='margin-top:8px; margin-left:8px; margin-right:8px; font-family:Georgia'>{{chart.html_below_title|safe}}</p>
+          <p id="chart_y_axis_description" align="left" style='margin-top:8px; margin-left:8px; margin-right:8px; color:#888888; font-family:ChunkFiveRegular; font-size:75%'>{{chart.y_axis_description|safe}}</p>
+
+          <div id="chartdiv"></div>
+
+          <div id="creditsdiv" style="font-family:Georgia; margin-left:125px; width:475px; font-size: 85%; color:#888888; text-align:left; float:left">
+            <b>Source</b>: <span id="chart_source_title">{{chart.source_title|safe}}</span>.
+          </div>
+        </div>
+      </td>
+      <td valign="top">
+        <div>
+          <span id="settingsTab" class="editorTab activeEditorTab" onclick="activateSettingsEditor();">Settings</span>
+          <span id="seriesTab" class="editorTab" onclick="activateSeriesEditor();">Series</span>
+        </div>
+        <div id="settingsForm" class="chartForm">
+          <form>
+            <input id="chartNumber" type="hidden" value={{chart.id}}>
+            <table>
+              <tr>
+                <td colspan="2">
+                  <div>Chart Title</div>
+                  <div class="formfield"><input id="chartTitle" style="width:100%" value=""></div>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2">
+                  <div>Chart Description (html)</div>
+                  <div class="formfield"><textarea id="chartHtmlBelowTitle" style="width:100%"></textarea></div>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2">
+                  <div>Y Axis Description</div>
+                  <div class="formfield"><input id="chartYAxisDescription" style="width:100%" value=""></div>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2">
+                  <div>Source (html)</div>
+                  <div class="formfield"><textarea id="chartSourceTitle" style="width:100%"></textarea></div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div>X Axis Minimum</div>
+                  <div class="formfield"><input id="xAxisMin" value="" style="margin-right: 10px;"></div>
+                </td>
+                <td>
+                  <div>X Axis Label</div>
+                  <div class="formfield"><input id="xAxisTitle" value=""></div>
+                </td>
+              <tr>
+                <td>
+                  <div>Y Axis Minimum</div>
+                  <div class="formfield"><input id="yAxisMin" value="" style="margin-right: 10px;"></div>
+                </td>
+                <td>
+                  <div>Y Axis Label</div>
+                  <div class="formfield"><input id="yAxisTitle" value=""></div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div>X Value of First Data Point</div>
+                  <div class="formfield"><input id="pointStart" value="" style="margin-right: 10px;"></div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div>Chart Width</div>
+                  <div class="formfield"><input id="chartWidth" value="" style="margin-right: 10px;"></div>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2">
+                  <input id="saveChartSettings" type="button" value="Save" onclick="editor.onSave();">
+                  <input id="saveQuitChartSettings" type="button" value="Save & Quit" onclick="saveAndQuit();">
+                  <input id="settingsStatus" type="text" class="status" readonly="readonly">
+                  <input id="resetChartSettings" type="button" value="Revert to Saved" onclick="editor.onRevert();">
+                </td>
+              </tr>
+            </table>
+          </form>
+        </div>
+        <div id="seriesForm" class="chartForm" style="display:none;">
+          <table>
+            <tr>
+              <td>
+                <div>Data</div>
+                <div class="formfield"><textarea rows="28" cols="40" id="seriesData"></textarea></div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input id="saveSeries" type="button" value="Save" onClick="editor.onSave();">
+		<input id="saveQuitSeries" type="button" value="Save & Quit" onClick="saveAndQuit();">
+                <input id="seriesStatus" type="text" class="status" readonly="readonly">
+                <input id="resetSeries" type="button" value="Revert to Saved" onclick="editor.onRevert();">
+              </td>
+            </tr>
+          </table>
+        </div>
+      </td>
+    </tr>
+    </tr></table>
+  </body>
+</html>

@@ -1,2 +1,15 @@
-
 .DS_Store
+.hg*
+*.aux
+*.dvi
+*.log
+*.pyc
+*~
+amcharts
+*.sqlite3
+web/projects/d4t4/secrets.py
+web/datacollective.org/public
+web/data/images/*.png
+web/data/images/*.svg
+web/data/imports/failures/*.txt
+web/localhost.pem

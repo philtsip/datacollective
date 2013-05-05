@@ -1,0 +1,353 @@
+{% load url from future %}
+{% load common_tags %}
+<html style="overflow-x:hidden; overflow-y:hidden">
+  <head>
+    <style type="text/css">
+      @font-face {
+          font-family: 'ChunkFiveRegular';
+          src: url('/static/fonts/Chunkfive-webfont.eot');
+          src: url('/static/fonts/Chunkfive-webfont.eot?#iefix') format('embedded-opentype'),
+               url('/static/fonts/Chunkfive-webfont.woff') format('woff'),
+               url('/static/fonts/Chunkfive-webfont.ttf') format('truetype'),
+               url('/static/fonts/Chunkfive-webfont.svg#ChunkFiveRegular') format('svg');
+          font-weight: normal;
+          font-style: normal;
+      }
+
+      @font-face {
+          font-family: 'OpenSansRegular';
+          src: url('/static/fonts/OpenSans-Regular-webfont.eot');
+          src: url('/static/fonts/OpenSans-Regular-webfont.eot?#iefix') format('embedded-opentype'),
+               url('/static/fonts/OpenSans-Regular-webfont.woff') format('woff'),
+               url('/static/fonts/OpenSans-Regular-webfont.ttf') format('truetype'),
+               url('/static/fonts/OpenSans-Regular-webfont.svg#OpenSansRegular') format('svg');
+          font-weight: normal;
+          font-style: normal;
+      }
+
+      @font-face {
+          font-family: 'OpenSansBold';
+          src: url('/static/fonts/OpenSans-Bold-webfont.eot');
+          src: url('/static/fonts/OpenSans-Bold-webfont.eot?#iefix') format('embedded-opentype'),
+               url('/static/fonts/OpenSans-Bold-webfont.woff') format('woff'),
+               url('/static/fonts/OpenSans-Bold-webfont.ttf') format('truetype'),
+               url('/static/fonts/OpenSans-Bold-webfont.svg#OpenSansBold') format('svg');
+          font-weight: normal;
+          font-style: normal;
+      }
+
+      body {
+        background-color: white;
+      }
+
+      h1 {
+        margin-top:8px;
+        margin-left:8px;
+        margin-right:8px;
+        margin-bottom:0px;
+        color: #3E679F;
+        font: 200%/125% 'ChunkFiveRegular', verdana, sans-serif;
+      }
+
+      #panelContainer { width:0; left:0; bottom:16px; position:absolute; overflow:hidden; background:#333; opacity:0; z-index:2 }
+      #panelContainer h1 { font-size:20px; height:30px; background-color:#000; color:#eee; padding:10px 0 0 10px; margin-bottom:10px; cursor:pointer }
+      #panelContainer ul { list-style:none; margin-top:0px; margin-bottom:20px; padding-left:10 }
+      #panelContainer ul li { margin:0; padding:0 0 2px 0; cursor:pointer; font-family:Verdana; font-size:12px; }
+      #panelContainer a { color:#fff; text-decoration:none }
+      #panelContainer #panel { margin-left:-175px }
+      #panelContainer #panel a:hover {text-decoration:underline }
+      #panelContainer #panel li img { vertical-align:text-bottom; padding-right: 5px; }
+
+      #showPanel { position:absolute; z-index:2; left:0; bottom:16px; padding-top:0px; width:0px; height:30px; cursor:pointer; margin-left:0; padding-bottom:0px; display:none;}
+      #showPanel span { display:block; font-size:20px; height:30px; padding:10px 0 0px 10px; width:100px; color:#fff; background:#333 }
+
+      #embeddiv { top:100px; left:50px; width:400px; padding: 10px; border: 2px solid; background-color: #eee;  z-index:2 }
+      #embeddiv a { color: #000; text-decoration:none; }
+      #embeddiv a:hover { text-decoration:underline; }
+
+      #linkdiv { top:100px; left:50px; padding: 10px; border: 2px solid; background-color: #eee;  z-index:2 }
+      #linkdiv a { color: #000; text-decoration:none; }
+      #linkdiv a:hover { text-decoration:underline; }
+    </style>
+
+    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js"></script>
+    <script type="text/javascript" src="/static/easyxdm/easyXDM.js"></script>
+    <script type="text/javascript" src="/static/highcharts.js"></script>
+{% if user.is_staff and internal %}
+    <script type="text/javascript" src="/static/modules/exporting.js"></script>
+{% endif %}
+
+    <script type="text/javascript">
+      var addthis_config = {
+        services_exclude: "twitter,facebook",
+        data_track_clickback: false,
+        ui_click: true
+      };
+      var addthis_share = {
+        title: "{{ chart.title|escapejs }}",
+        url: "{{ url|escapejs }}",
+        description: "{{ chart.description|escapejs }}"
+      }
+    </script>
+    <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js#pubid=ra-4db065a4597e8114"></script>
+
+    <script type="text/javascript">
+      //
+      // supportsVml and supportsSVG thanks to http://stackoverflow.com/questions/654112/how-do-you-detect-support-for-vml-or-svg-in-a-browser
+      //
+
+      function supportsVml() {
+          if (typeof supportsVml.supported == "undefined") {
+              var a = document.body.appendChild(document.createElement('div'));
+              a.innerHTML = '<v:shape id="vml_flag1" adj="1" />';
+              var b = a.firstChild;
+              b.style.behavior = "url(#default#VML)";
+              supportsVml.supported = b ? typeof b.adj == "object": true;
+              a.parentNode.removeChild(a);
+          }
+          return supportsVml.supported
+      }
+
+      function supportsSVG() {
+        return document.implementation.hasFeature("http://www.w3.org/TR/SVG11/feature#BasicStructure", "1.1")
+      }
+
+      function renderDynamicChart() {
+        var options = {{chart.chart_settings|safe}};
+
+        if (!options.chart) {
+          options.chart = {};
+        }
+        if (!options.chart.renderTo) {
+          options.chart.renderTo = 'chartdiv';
+        }
+        if (!options.chart.defaultSeriesType) {
+          options.chart.defaultSeriesType = 'line';
+        }
+
+        if (!options.title) {
+          options.title = {};
+        }
+        if (!options.title.text) {
+          options.title.text = "";
+        }
+
+        if (!options.credits) {
+          options.credits = {};
+        }
+        if (!options.credits.text) {
+          options.credits.text = "";
+        }
+
+        if (!options.xAxis) {
+          options.xAxis = {};
+        }
+        if (!options.xAxis.labels) {
+          options.xAxis.labels = {};
+        }
+        if (!options.xAxis.labels.formatter) {
+          options.xAxis.labels.formatter = function() { return this.value; };
+        }
+        if (!options.yAxis) {
+          options.yAxis = {};
+        }
+        if (!options.yAxis.title) {
+          options.yAxis.title = { text: null };
+        }
+
+{% if user.is_staff and internal %}
+options.exporting = {url: "{% url 'chart.views.convert' chart.id %}"};
+{% endif %}
+        options.series = {{ chart.chart_data|safe }};
+        if (!options.plotOptions) {
+          options.plotOptions = {};
+        }
+        if (!options.plotOptions.line) {
+          options.plotOptions.line = {};
+        }
+        if (!options.plotOptions.line.lineWidth) {
+          options.plotOptions.line.lineWidth = 5;
+        }
+        if (!options.plotOptions.line.marker) {
+          options.plotOptions.line.marker = { enabled: false,
+                                              symbol: 'circle',
+                                              states: {
+                                                hover: {
+                                                   enabled: true
+                                                }
+                                              }
+                                            };
+        }
+        var chart = new Highcharts.Chart(options);
+      }
+
+      function renderStaticImage() {
+        $("#chartdiv").append('<a href="/chart/{{ chart.id }}" target="_blank"><img src="/chart/image/{{ chart.id }}" alt="{{ chart.title }}"/></a>');
+      }
+
+      function showPanel() {
+        $("#panel").animate({marginLeft:"0px"}, 400 );
+        $("#panelContainer").animate({width:"250px", opacity:1}, 400 );
+        $("#showPanel").animate({width:"0px", opacity:0}, 600).hide("slow");
+      }
+
+      function hidePanel() {
+        $("#panel").animate({marginLeft:"-175px"}, 500 );
+        $("#panelContainer").animate({width:"0px", opacity:0}, 400 );
+        $("#showPanel").show("normal").animate({width:"28px", opacity:1}, 200);
+      }
+
+      function centerPopupDiv(div) {
+        div.css("top", (($(window).height() - div.outerHeight()) / 2) + $(window).scrollTop() + "px");
+        div.css("left", (($(window).width() - div.outerWidth()) / 2) + $(window).scrollLeft() + "px");
+      }
+
+      function showEmbedPopup() {
+        var div = $("#embeddiv");
+
+        centerPopupDiv(div);
+        div.fadeIn();
+
+        $("#embeddiv textarea").select();
+      }
+
+      function hideEmbedPopup() {
+        $("#embeddiv").fadeOut();
+      }
+
+      function showLinkPopup() {
+        var div = $("#linkdiv");
+
+        centerPopupDiv(div);
+        div.fadeIn();
+
+        $("#linkdiv textarea").select();
+      }
+
+      function hideLinkPopup() {
+        $("#linkdiv").fadeOut();
+      }
+
+      function editChart() {
+        window.open("/chart/edit/{{chart.id}}/");
+      }
+
+      $(window).load(function() {
+        var DATACOLLECTIVE = { easyXDM: easyXDM.noConflict("DATACOLLECTIVE")  };
+        var socket = new DATACOLLECTIVE.easyXDM.Socket({
+          onReady: function() { socket.postMessage(document.body.scrollHeight); }
+        });
+      });
+
+      $(document).ready(function() {
+        $("#panel #title").click(function() {
+          hidePanel();
+        });
+
+        $("#showPanel").click(function() {
+          showPanel();
+        });
+
+        $("#embed").click(function() {
+          showEmbedPopup();
+          hidePanel();
+        });
+
+        $("#link").click(function() {
+          showLinkPopup();
+          hidePanel();
+        });
+
+        $("#facebook").click(function() {
+          window.open("https://www.facebook.com/sharer.php?u={{url}}&t={{ chart.title }}");
+          hidePanel();
+        });
+
+        $("#twitter").click(function() {
+          window.open("https://twitter.com/share?url={{shorturl}}&text={{ chart.title }}&via=_datacollective&related=_datacollective");
+          hidePanel();
+        });
+
+        if (supportsVml() || supportsSVG()) {
+          renderDynamicChart();
+        }
+        else {
+          renderStaticImage();
+        }
+
+        $("#showPanel").show();
+      });
+
+    </script>
+  </head>
+
+  <body>
+    <h1 align="left">{{ chart.title }}</h1>
+{% if chart.html_below_title %}
+    <p align="left" style='margin-top:8px; margin-left:8px; margin-right:8px; font-family:Georgia'>{{ chart.html_below_title|safe }}</p>
+{% endif %}
+{% if chart.y_axis_description %}
+    <p align="left" style='margin-top:8px; margin-left:8px; margin-right:8px; color:#888888; font-family:ChunkFiveRegular; font-size:75%'>{{ chart.y_axis_description|safe }}</p>
+{% endif %}
+
+    <div id="chartdiv">
+      <noscript>
+        <a href="/chart/{{ chart.id }} "target="_blank"><img src="/chart/image/{{ chart.id }}" alt="{{ chart.title|safe }}"/></a>
+      </noscript>
+    </div>
+
+    <div id="panelContainer">
+      <div id="panel">
+        <h1 id="title">&laquo; Share this chart!</h1>
+        <ul>
+          <li id="embed"><img src="/static/chart/embed.png"><a href="#">in your own webpage</a></li>
+          <li id="facebook"><img src="/static/chart/fb-16.png"><a href="#">on facebook</a></li>
+          <li id="twitter"><img src="/static/chart/twitter-16.png"><a href="#">to twitter</a></li>
+          <li id="addthis">
+          <a href="http://www.addthis.com/bookmark.php"
+            class="addthis_button">
+            <img src="/static/chart/addthis-16.png">everywhere else
+          </a>
+          </li>
+{% if not internal %}
+          <li>&nbsp</li>
+	  <li><a target="_blank" href="/chart/{{ chart.id }}">See source data and credits at Data Collective</a></li>
+{% endif %}
+        </ul>
+      </div>
+    </div>
+
+    <h1 id="showPanel"><span>Share &raquo;</span></h1>
+
+    <div id="creditsdiv" style="font-family:Georgia; margin-top:24px; margin-left:125px; width:{{ source_width }}px; font-size: 85%; color:#888888; text-align:left; float:left">
+      <b>Source</b>: {{chart.source_title|safe}}.
+{% if not internal %}
+Complete source data, credits and more at <a target="_blank" href="/chart/{{ chart.id }}">Data Collective</a>.
+{% endif %}
+    </div>
+
+{% if chart.creator == user or user.is_superuser%}
+    {% if internal %}
+       <div style="float:right;"><input type="button" value="Edit" onclick="editChart();"></div>
+    {% endif %}
+{% endif %}
+       
+    <div id="embeddiv" style="position:absolute; display:none; font-family:Georgia">
+      Copy and paste the following code into your web page, blog post,
+      {{ 'term paper, love letter, op-ed, manifesto'|split:', '|random }}
+      or anywhere else!
+      <br><br>
+<textarea readonly=readonly style="width:400px; height:8em">
+&lt;div class="datacollective-chart" id="datacollective-chart-{{chart.id}}"&gt;
+&lt;noscript&gt;&lt;iframe src="https://{{host}}/chart/embed/{{chart.id}}" width="{% if chart.chart_width %}{{chart.chart_width}}{% else %}630{% endif %}" height="690" frameborder="0">&lt;/iframe&gt;&lt;/noscript&gt;
+&lt;/div&gt;
+&lt;script type="text/javascript" src="https://{{host}}/chart/embedjs/{{chart.id}}"&gt;&lt;/script&gt;
+</textarea>
+      <br>
+      <div>
+      <p align="right" style="margin-bottom:0px"><a href="#" onclick="hideEmbedPopup();">close</a></p>
+      </div>
+    </div>
+
+  </body>
+</html>
